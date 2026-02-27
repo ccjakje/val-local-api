@@ -1,0 +1,7 @@
+/target/
+**/*.rs.bk
+*.pdb
+.vscode/
+.idea/
+.env
+build_errors.txt

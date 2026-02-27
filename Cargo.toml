@@ -1,0 +1,37 @@
+[package]
+name = "val-local-api"
+version = "0.1.0"
+edition = "2021"
+description = "Rust wrapper for Valorant's local client APIs"
+license = "MIT"
+repository = "https://github.com/ccjakje/val-local-api"
+
+[lib]
+name = "val_local_api"
+path = "src/lib.rs"
+
+[[bin]]
+name = "val-local-api-server"
+path = "src/bin/server.rs"
+
+[dependencies]
+tokio = { version = "1", features = ["full"] }
+reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+base64 = "0.22"
+thiserror = "1"
+anyhow = "1"
+notify = "6"
+tokio-stream = "0.1"
+dirs = "5"
+urlencoding = "2"
+axum = { version = "0.7", optional = true }
+tower-http = { version = "0.5", features = ["cors"], optional = true }
+
+[features]
+server = ["axum", "tower-http"]
+default = []
+
+[dev-dependencies]
+tokio-test = "0.4"
