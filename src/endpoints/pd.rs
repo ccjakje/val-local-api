@@ -4,25 +4,14 @@ use crate::models::match_data::{MatchDetails, MatchHistoryEntry};
 use crate::models::player::{NameEntry, MmrData};
 
 impl ValorantClient {
-    /// Resolve name+tag → PUUID using the name-service.
-    /// Passes "Name#Tag" string to the same PUT endpoint used for PUUID→name.
-    pub async fn lookup_player(&self, name: &str, tag: &str) -> Result<String, ValorantError> {
-        let query = format!("{}#{}", name, tag);
-        let url = format!("{}/name-service/v2/players", self.pd_url().await);
-        let resp: Vec<serde_json::Value> = self.http
-            .put(&url)
-            .headers(self.auth_headers().await)
-            .json(&vec![&query])
-            .send().await?.json().await?;
-
-        resp.into_iter()
-            .find(|v| {
-                let game_name = v["GameName"].as_str().unwrap_or("").to_lowercase();
-                let tag_line  = v["TagLine"].as_str().unwrap_or("").to_lowercase();
-                game_name == name.to_lowercase() && tag_line == tag.to_lowercase()
-            })
-            .and_then(|v| v["Subject"].as_str().map(|s| s.to_string()))
-            .ok_or(ValorantError::ApiError { status: 404, message: "Player not found".into() })
+    /// Resolve name+tag → PUUID.
+    /// NOTE: The local Riot API has no name→PUUID endpoint.
+    /// This method exists as a placeholder — callers should use Henrik API for this lookup.
+    pub async fn lookup_player(&self, _name: &str, _tag: &str) -> Result<String, ValorantError> {
+        Err(ValorantError::ApiError {
+            status: 501,
+            message: "Name→PUUID lookup requires an external API (use Henrik)".into(),
+        })
     }
 
     /// PUUID → name + tag for multiple players
