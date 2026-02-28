@@ -4,20 +4,25 @@ use crate::models::match_data::{MatchDetails, MatchHistoryEntry};
 use crate::models::player::{NameEntry, MmrData};
 
 impl ValorantClient {
-    /// Resolve name+tag → PUUID for any player
+    /// Resolve name+tag → PUUID using the name-service.
+    /// Passes "Name#Tag" string to the same PUT endpoint used for PUUID→name.
     pub async fn lookup_player(&self, name: &str, tag: &str) -> Result<String, ValorantError> {
-        let url = format!("{}/name-service/v1/accounts?query={}%23{}", 
-            self.pd_url().await, 
-            urlencoding::encode(name), 
-            urlencoding::encode(tag)
-        );
-        let resp: serde_json::Value = self.http.get(&url)
+        let query = format!("{}#{}", name, tag);
+        let url = format!("{}/name-service/v2/players", self.pd_url().await);
+        let resp: Vec<serde_json::Value> = self.http
+            .put(&url)
             .headers(self.auth_headers().await)
+            .json(&vec![&query])
             .send().await?.json().await?;
-            
-        resp.as_array().and_then(|arr| arr.get(0)).and_then(|first| first["Subject"].as_str())
+
+        resp.into_iter()
+            .find(|v| {
+                let game_name = v["GameName"].as_str().unwrap_or("").to_lowercase();
+                let tag_line  = v["TagLine"].as_str().unwrap_or("").to_lowercase();
+                game_name == name.to_lowercase() && tag_line == tag.to_lowercase()
+            })
+            .and_then(|v| v["Subject"].as_str().map(|s| s.to_string()))
             .ok_or(ValorantError::ApiError { status: 404, message: "Player not found".into() })
-            .map(|s| s.to_string())
     }
 
     /// PUUID → name + tag for multiple players
