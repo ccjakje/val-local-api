@@ -10,6 +10,7 @@ pub struct ValorantClient {
     pub(crate) http: Client,
     pub(crate) lockfile: LockfileData,
     pub(crate) auth: Arc<RwLock<RiotAuth>>,
+    pub(crate) client_version: String,
 }
 
 impl ValorantClient {
@@ -21,11 +22,14 @@ impl ValorantClient {
 
         let lockfile = LockfileData::read()?;
         let auth = RiotAuth::fetch(&http, &lockfile).await?;
+        let client_version = fetch_client_version(&http, &lockfile).await
+            .unwrap_or_else(|_| "release-10.03.0".to_string());
 
         Ok(Self {
             http,
             lockfile,
             auth: Arc::new(RwLock::new(auth)),
+            client_version,
         })
     }
 
@@ -51,7 +55,7 @@ impl ValorantClient {
         headers.insert("X-Riot-Entitlements-JWT",
             auth.entitlements_token.parse().unwrap());
         headers.insert("X-Riot-ClientVersion",
-            "release-10.03.0".parse().unwrap()); // Fallback version
+            self.client_version.parse().unwrap()); 
         headers.insert("X-Riot-ClientPlatform",
             "ew0KCSJwbGF0Zm9ybVR5cGUiOiAiUEMiLA0KCSJwbGF0Zm9ybU9TIjogIldpbmRvd3MiLA0KCSJwbGF0Zm9ybU9TVmVyc2lvbiI6ICIxMC4wLjE5MDQyLjEuMjU2LjY0Yml0IiwNCgkicGxhdGZvcm1DaGlwc2V0IjogIlVua25vd24iDQp9".parse().unwrap());
         headers
@@ -64,4 +68,23 @@ impl ValorantClient {
     pub async fn get_auth(&self) -> RiotAuth {
         self.auth.read().await.clone()
     }
+}
+
+async fn fetch_client_version(http: &Client, lockfile: &LockfileData) -> Result<String, ValorantError> {
+    let base = format!("{}://127.0.0.1:{}", lockfile.protocol, lockfile.port);
+    let resp: serde_json::Value = http
+        .get(format!("{}/product-session/v1/external-sessions", base))
+        .basic_auth("riot", Some(&lockfile.password))
+        .send().await?.json().await?;
+    
+    if let Some(map) = resp.as_object() {
+        for (_, session) in map {
+            if let Some(version) = session["version"].as_str() {
+                if !version.is_empty() {
+                    return Ok(version.to_string());
+                }
+            }
+        }
+    }
+    Err(ValorantError::ApiError { status: 404, message: "version not found".into() })
 }

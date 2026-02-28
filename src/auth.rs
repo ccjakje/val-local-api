@@ -75,20 +75,41 @@ impl RiotAuth {
 
 fn parse_region_from_token(token: &str) -> Result<(String, String), ValorantError> {
     let parts: Vec<&str> = token.split('.').collect();
-    if parts.len() < 2 { 
-        return Err(ValorantError::AuthFailed("invalid JWT".into())); 
+    if parts.len() < 2 {
+        return Err(ValorantError::AuthFailed("invalid JWT".into()));
     }
-    
-    let payload = base64::engine::general_purpose::URL_SAFE_NO_PAD
-        .decode(parts[1])
+
+    // Pad base64 if needed
+    let padded = {
+        let s = parts[1];
+        let padding = (4 - s.len() % 4) % 4;
+        format!("{}{}", s, "=".repeat(padding))
+    };
+
+    let payload = base64::engine::general_purpose::URL_SAFE
+        .decode(&padded)
         .map_err(|_| ValorantError::AuthFailed("JWT decode failed".into()))?;
-        
+
     let json: serde_json::Value = serde_json::from_slice(&payload)?;
-    
-    let shard = json["shard"].as_str()
-        .or_else(|| json["acr"]["region"].as_str())
-        .unwrap_or("eu")
-        .to_string();
-        
+
+    // Try multiple known fields where region appears
+    let shard = json.pointer("/acct/country")
+        .or_else(|| json.get("region"))
+        .or_else(|| json.get("shard"))
+        .and_then(|v| v.as_str())
+        .map(map_region_to_shard)
+        .unwrap_or_else(|| "eu".to_string());
+
+    // region and shard are often the same for Valorant
     Ok((shard.clone(), shard))
+}
+
+fn map_region_to_shard(region: &str) -> String {
+    match region.to_lowercase().as_str() {
+        "euw" | "eune" | "eu" | "tr" | "ru" => "eu",
+        "na" | "us" | "br" | "latam" | "lan" | "las" => "na",
+        "ap" | "kr" | "jp" | "oce" | "sea" => "ap",
+        other => other,
+    }
+    .to_string()
 }

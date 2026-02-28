@@ -23,7 +23,7 @@ base64 = "0.22"
 thiserror = "1"
 anyhow = "1"
 notify = "6"
-tokio-stream = "0.1"
+tokio-stream = { version = "0.1.16", features = ["sync"] }
 dirs = "5"
 urlencoding = "2"
 axum = { version = "0.7", optional = true }

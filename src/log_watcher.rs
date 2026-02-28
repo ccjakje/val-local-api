@@ -21,6 +21,14 @@ impl LogWatcher {
         (Self { sender: tx }, rx)
     }
 
+    pub fn subscribe(&self) -> broadcast::Receiver<LogEvent> {
+        self.sender.subscribe()
+    }
+
+    pub fn sender(&self) -> broadcast::Sender<LogEvent> {
+        self.sender.clone()
+    }
+
     pub fn start(&self) -> Result<(), anyhow::Error> {
         let log_path = Self::log_path()?;
         let sender = self.sender.clone();
