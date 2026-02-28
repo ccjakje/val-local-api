@@ -10,7 +10,7 @@ use tokio::sync::broadcast;
 use tokio_stream::{wrappers::BroadcastStream, StreamExt};
 use tower_http::cors::CorsLayer;
 use serde_json::json;
-use val_local_api::{ValorantClient, ValorantError, LogWatcher, LogEvent, NameEntry};
+use val_local_api::{ValorantClient, ValorantError, LogWatcher, LogEvent};
 
 #[derive(Clone)]
 struct AppState {
@@ -71,15 +71,14 @@ async fn status_handler(State(state): State<AppState>) -> Json<serde_json::Value
     }
     if state.client.coregame_player(&puuid).await.is_ok() {
         return Json(json!({ "running": true, "phase": "ingame" }));
-    }
-    Json(json!({ "running": true, "phase": "menu" }))
+    }    Json(json!({ "running": true, "phase": "menu" }))
 }
 
 async fn auth_handler(State(state): State<AppState>) -> Json<serde_json::Value> {
     let auth = state.client.get_auth().await;
     let puuid = auth.puuid.clone();
     
-    let names = state.client.resolve_names(&[puuid.clone()]).await.ok();
+    let names: Option<Vec<val_local_api::NameEntry>> = state.client.resolve_names(&[puuid.clone()]).await.ok();
     let (name, tag) = names
         .and_then(|mut n| n.pop())
         .map(|e| (e.name, e.tag))

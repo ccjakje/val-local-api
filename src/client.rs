@@ -68,6 +68,54 @@ impl ValorantClient {
     pub async fn get_auth(&self) -> RiotAuth {
         self.auth.read().await.clone()
     }
+
+    /// Generic GET against the PD (Player Data) cluster.
+    /// Use this for endpoints the library doesn't yet wrap natively.
+    pub async fn raw_get_pd(&self, path: &str) -> Result<serde_json::Value, ValorantError> {
+        let url = format!("{}{}", self.pd_url().await, path);
+        let resp = self.http.get(&url).headers(self.auth_headers().await).send().await?;
+        if !resp.status().is_success() {
+            return Err(ValorantError::ApiError {
+                status: resp.status().as_u16(),
+                message: path.to_string(),
+            });
+        }
+        Ok(resp.json().await?)
+    }
+
+    /// Generic GET against the GLZ (Game Lobby Zone) cluster.
+    pub async fn raw_get_glz(&self, path: &str) -> Result<serde_json::Value, ValorantError> {
+        let url = format!("{}{}", self.glz_url().await, path);
+        let resp = self.http.get(&url).headers(self.auth_headers().await).send().await?;
+        if !resp.status().is_success() {
+            return Err(ValorantError::ApiError {
+                status: resp.status().as_u16(),
+                message: path.to_string(),
+            });
+        }
+        Ok(resp.json().await?)
+    }
+
+    /// Generic PUT against the PD cluster (e.g. name-service).
+    pub async fn raw_put_pd<B: serde::Serialize>(
+        &self,
+        path: &str,
+        body: &B,
+    ) -> Result<serde_json::Value, ValorantError> {
+        let url = format!("{}{}", self.pd_url().await, path);
+        let resp = self.http
+            .put(&url)
+            .headers(self.auth_headers().await)
+            .json(body)
+            .send().await?;
+        if !resp.status().is_success() {
+            return Err(ValorantError::ApiError {
+                status: resp.status().as_u16(),
+                message: path.to_string(),
+            });
+        }
+        Ok(resp.json().await?)
+    }
 }
 
 async fn fetch_client_version(http: &Client, lockfile: &LockfileData) -> Result<String, ValorantError> {
